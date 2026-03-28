@@ -1,24 +1,43 @@
 #include <BLEDevice.h>
+#include <WiFi.h>
+#include <WebServer.h>
 
 BLEScan* pScan;
 BLEClient* pClient;
+
 bool connected = false;
+String temperature = "";
+
+WebServer server(80);
 
 static void notifyCallback(BLERemoteCharacteristic* pRemoteChar, uint8_t* pData, size_t length, bool isNotify) {
+  temperature = "";
+  for (size_t i = 0; i < length; i++) temperature += (char)pData[i];
+
   Serial.print("Temperature: ");
-  for (size_t i = 0; i < length; i++) Serial.print((char)pData[i]);
-  Serial.println();
+  Serial.println(temperature);
 }
 
 void setup() {
   Serial.begin(115200);
 
-  BLEDevice::init("ESP32 Gateway Node");
+  BLEDevice::init();
 
   pScan = BLEDevice::getScan();
   pScan->setActiveScan(true);
 
   pClient = BLEDevice::createClient();
+
+  WiFi.softAP("ESP32 Gateway Node", "12345678");
+
+  Serial.print("AP IP address: ");
+  Serial.println(WiFi.softAPIP());
+
+  server.on("/", [] {
+    server.send(200, "text/plain", "Current temperature: " + temperature);
+  });
+
+  server.begin();
 }
 
 void loop() {
@@ -58,5 +77,5 @@ void loop() {
     Serial.println("Disconnected!");
   }
 
-  delay(5000);
+  server.handleClient();
 }
